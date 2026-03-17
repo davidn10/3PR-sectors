@@ -1,0 +1,43 @@
+use "../data/sectors_pip", replace 
+drop if year==2025 
+recode year (1990/1994=1 "1990-1994") (1995/1999=2 "1995-1999") (2000/2004=3 "2000-2004") (2005/2009=4 "2005-2009") (2010/2014=5 "2010-2014") (2015/2019=6 "2015-2019") (2020/2024=7 "2020-2024"), gen(year_cat)
+
+egen Nobs=sum(1), by(country_code)
+gen wt=1/(Nobs-1)
+count if sharetTourism==. & headcount<. 
+encode country_code, gen(country_id)
+encode region_code, gen(region_id)
+gen lnpop=log(population)
+gen lngdp=log(gdp)
+keep if lngdp<. 
+
+mi set wide
+mi set wide
+mi register imputed sharetTourism
+local sectors "sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth sharetTourism sharetManufac sharetOthernonag sharetRetailtradenonvehicle"
+local sectorsnotourism "sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth sharetManufac sharetOthernonag sharetRetailtradenonvehicle"
+mi register regular headcount lngdp poverty_gap lnpop `sectorsnotourism'
+mi impute truncreg sharetTourism headcount poverty_gap lngdp lnpop ///
+    i.region_id i.year, ///
+    ll(0) ul(1) add(100) rseed(12345)
+
+	egen mean_sharetTourism = rowmean(_*_sharetTourism)
+	
+local options "degree(1) bwidth(0.5) lwidth(medthick)"
+	
+twoway ///     
+    (lpoly sharetInfraEnergy lngdp, `options')      ///
+    (lpoly sharetAgribusiness  lngdp, `options')       ///
+	(lpoly sharetAgricSE  lngdp, `options')       ///
+    (lpoly sharetHealth lngdp, `options')     ///
+    (lpoly mean_sharetTourism lngdp, `options')    ///
+    (lpoly sharetManufac lngdp, `options')   ///
+	(lpoly sharetOthernonag lngdp, `options')   ///
+	(lpoly sharetRetailtradenonvehicle lngdp, `options')   ///
+	(histogram lngdp, fraction color(gs12%50) gap(10)), ///
+     legend(order(1 "Infrastructure" 2 "Agribusiness" 3 "SE Agric" 4 "Health" 5 "Tourism" 6 "Manufacturing" 7 "Other non-ag" 8 "Retail Trade")) ///
+	xlabel(6.9 "1000" 8.5 "5000" 9.2 "10000" 10.1 "25000" 10.8 "50000") ///
+    ytitle("Employment Share (%)") xtitle("GDP per capita") saving(gdp_employment, replace)
+
+graph export "D:\david\3PR\output\emp_gdp.png", replace 	
+putexcel A10 = image("D:\david\3PR\output\emp_gdp.png")	
