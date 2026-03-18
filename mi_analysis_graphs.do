@@ -43,7 +43,7 @@ mi impute chained ///
     (truncreg, ll(0) ul(1)) tourism_within ///
 	(truncreg, ll(0) ul(1)) male_within_Tourism /// 
 	(truncreg, ll(0) ul(1)) male_within_Othernonag ///
-	= headcount poverty_gap lngdp lnpop ///
+	= headcount poverty_gap lngdp lnpop sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth sharetManufac ///
     i.region_id i.year, ///
     add(100) rseed(12345)
 

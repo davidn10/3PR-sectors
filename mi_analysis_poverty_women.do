@@ -68,7 +68,6 @@ local p = T[4,`col_idx']
 local row=`row'+2 
 putexcel C`row'=`=e(N)'
 
-exit  
 preserve 
 mi extract 1, clear
 fracreg probit headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
