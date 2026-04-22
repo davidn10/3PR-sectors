@@ -1,0 +1,276 @@
+
+cd "D:\david\3PR\programs" 
+
+use "../data/mi_data", replace 
+local sectors "InfraEnergy Agribusiness AgricSE Health Tourism Manufac Othernonag Trade"
+foreach sector in `sectors' {
+	local dln_sectors "`dln_sectors' dln_employt`sector'"
+	local ln_sectors "`ln_sectors' ln_employt`sector'" 
+}
+
+
+* Pretty names for graph titles
+local name_lnemptInfraEnergy "Infrastructure"
+local name_lnemptAgribusiness "Agribusiness"
+local name_lnemptAgricSE "Self-employed Agriculture"
+local name_lnemptHealth "Health"
+local name_lnemptTourism "Tourism"
+local name_lnemptManufac "Manufacturing"
+local name_lnemptOthernonag "Other non-ag"
+local name_lnemptTrade "Retail trade"
+
+
+local Nsectorsm1=7
+local Nsectors=8 
+
+bys country_id (year): gen appearance=_n 
+bys country_id (year): gen Nappearances=_N 
+mi tsset country_id appearance 
+
+gen gap=year-l.year 
+
+foreach sector in employtInfraEnergy employtAgribusiness employtAgricSE employtHealth employtManufac employtTrade { 
+	gen emp_wap_`sector'=`sector'/wap 
+	gen dln_`sector'=(ln(emp_wap_`sector')-ln(l.emp_wap_`sector'))/gap 
+	gen ln_`sector'=ln(emp_wap_`sector') 
+}
+
+gen dheadcount=(headcount-l.headcount)/gap 
+gen lnheadcount=ln(headcount) 
+gen dlnheadcount=(lnheadcount-l.lnheadcount)/gap
+gen lnwap_pop=ln(wap/population) 
+gen dlnwap_pop=(lnwap_pop-l.lnwap_pop)/gap 
+
+
+foreach sector in employtTourism employtOthernonag {
+mi passive: gen dln_`sector'=(ln(`sector'/wap)-ln(l.`sector'/l.wap))/gap 
+mi passive: gen ln_`sector'=ln(`sector'/wap) 
+} 
+
+* --- Country-level average poverty (the moderator) ---
+egen avg_pov = mean(headcount), by(country_code)
+
+* --- Build factor-variable interaction lists for both specs ---
+local dln_sectors_fv ""
+foreach s of local sectors {
+    local dln_sectors_fv "`dln_sectors_fv' c.dln_employt`s'#c.avg_pov"
+}
+
+local lnsectors_fv ""
+foreach s of local sectors {
+    local lnsectors_fv "`lnsectors_fv' c.ln_employt`s'#c.avg_pov"
+}
+
+* =========================================================================
+* SPEC 1: First differences with avg_pov interactions
+* =========================================================================
+/*
+mi estimate, post dots: ///
+    regress dlnheadcount `dln_sectors' `dln_sectors_fv' dlnwap_pop i.country_id i.year_cat, ///
+    vce(cluster country_id)
+estimates save "poverty_spec3_interaction", replace  
+*/ 
+estimates use "poverty_spec3_interaction"
+
+* Extract sample indicator to replicate sample in levels regression 
+save "mydata_mi.dta", replace
+mi extract 1
+regress dlnheadcount `dln_sectors' `dln_sectors_fv' dlnwap_pop i.country_id i.year_cat, vce(cluster country_id)
+gen insample = e(sample)
+tempfile samp
+keep insample country_id year
+save `samp'
+use "mydata_mi.dta", replace
+merge m:1 country_id year using `samp', nogen
+mi register regular insample
+mi update
+
+keep if insample==1 
+
+* =========================================================================
+* SPEC 2: Levels on the first-diff subsample, with avg_pov interactions
+* =========================================================================
+/*
+mi estimate, post dots: ///
+    regress lnheadcount `ln_sectors' `lnsectors_fv' lnwap_pop i.country_id i.year_cat if insample==1, ///
+    vce(cluster country_id)
+	
+estimates save "poverty_spec3b_interaction", replace  
+*/
+estimates use "poverty_spec3b_interaction"
+putexcel set "D:\david\3PR\output\results_macro.xlsx", modify sheet("Poverty_spec3_interaction")
+
+* =========================================================================
+* Marginal effects loop for SPEC 1 (first differences)
+* =========================================================================
+estimates use "poverty_spec3_interaction"
+estimates replay 
+/*
+foreach s of local sectors {
+    dis "First-diff spec: `s'"
+    mimrgns, dydx(dln_employt`s') at(avg_pov=(0(0.1)0.8)) cmdmargins 
+    
+    marginsplot, ///
+        recast(line) recastci(rarea) ///
+        ciopts(color(%30)) ///
+        yline(0, lcolor(black) lpattern(dash)) ///
+        title("`name_`s''") ///
+        xtitle("") ///
+        ytitle("") ///
+        xlabel(0(0.1)0.8) ///
+        xscale(reverse) ///
+        name(me_fd_`s', replace)
+    
+	graph save "me_fd_`s'", replace 
+    graph export "me_fd_`s'.png", replace
+	
+}
+*/ 
+
+foreach s of local sectors {
+	graph use "me_fd_`s'"
+} 
+
+graph combine me_fd_lnemptInfraEnergy me_fd_lnemptAgribusiness me_fd_lnemptAgricSE ///
+    me_fd_lnemptHealth me_fd_lnemptTourism me_fd_lnemptManufac ///
+    me_fd_lnemptOthernonag me_fd_lnemptTrade, ///
+    cols(2) ysize(11) xsize(8.5) ///
+    b1title("Average poverty headcount") ///
+    l1title("Estimated effect on annualized change in log headcount") ///
+    xcommon ycommon
+
+graph export "me_fd_combined.png", replace width(2000)
+putexcel F2 = image("me_fd_combined.png")
+*/ 
+
+* =========================================================================
+* Marginal effects loop for SPEC 2 (levels on the subsample)
+* =========================================================================
+estimates use "poverty_spec3b_interaction"
+estimates replay 
+/*
+foreach s of local sectors {
+    dis "Levels spec: `s'"
+    mimrgns, dydx(ln_employt`s') at(avg_pov=(0(0.1)0.8)) cmdmargins 
+    
+    marginsplot, ///
+        recast(line) recastci(rarea) ///
+        ciopts(color(%30)) ///
+        yline(0, lcolor(black) lpattern(dash)) ///
+        title("`name_`s''") ///
+        xtitle("") ///
+        ytitle("") ///
+        xlabel(0(0.1)0.8) ///
+        xscale(reverse) ///
+        name(me_lv_`s', replace)
+    graph save "me_lv_`s'", replace 
+    graph export "me_lv_`s'.png", replace
+}
+*/
+foreach s of local sectors {
+	graph use "me_lv_`s'"
+}
+
+
+graph combine me_lv_lnemptInfraEnergy me_lv_lnemptAgribusiness me_lv_lnemptAgricSE ///
+    me_lv_lnemptHealth me_lv_lnemptTourism me_lv_lnemptManufac ///
+    me_lv_lnemptOthernonag me_lv_lnemptTrade, ///
+    cols(2) ysize(11) xsize(8.5) ///
+    b1title("Average poverty headcount") ///
+    l1title("Estimated semi-elasticity of headcount wrt employment") ///
+    xcommon ycommon
+
+graph export "me_lv_combined.png", replace width(2000)
+putexcel R2 = image("me_lv_combined.png")
+*/ 
+* =========================================================================
+* Coefficient tables — post AMEs averaged over avg_pov for each sector
+* Column B = first-diff spec, Column C = levels spec
+* =========================================================================
+
+* --- First-diff spec: AMEs over the full avg_pov range ---
+/*
+estimates use "poverty_spec3_interaction"
+estimates replay 
+mimrgns , dydx(dln_employtInfraEnergy dln_employtAgribusiness dln_employtAgricSE ///
+    dln_employtHealth dln_employtTourism dln_employtManufac ///
+    dln_employtOthernonag dln_employtTrade) cmdmargins at(avg_pov=(0(0.1)0.8)) post 
+estimates save "mimrgns_fd", replace 
+*/  
+estimates use "mimrgns_fd"
+ereturn display
+matrix T = r(table)
+
+local row=3
+local col=1 
+
+foreach s in `sectors' {
+
+	local rt_col=`col'+8
+
+	foreach col_idx of numlist `rt_col'/`col' {
+		putexcel B`row'=T[1,`col_idx']
+		local p = T[4, `col_idx']
+		if `p' < 0.05 {
+			putexcel B`row', bold
+		}
+		local row = `row' + 1
+	}
+
+	local row = `row' + 1
+} 
+
+putexcel B`row' = `=e(N)'
+
+preserve
+mi extract 1, clear
+regress dlnheadcount `dsectors' `d_sectors_fv' dlnwap i.country_id i.year_cat, vce(cluster country_id)
+unique country_code if e(sample)
+local row = `row' + 1
+putexcel B`row' = `=r(unique)'
+restore
+
+* --- Levels spec: AMEs over the full avg_pov range ---
+estimates use "poverty_spec3b_interaction"
+/*
+mimrgns, dydx(lnemptInfraEnergy lnemptAgribusiness lnemptAgricSE ///
+    lnemptHealth lnemptTourism lnemptManufac ///
+    lnemptOthernonag lnemptTrade) cmdmargins post at(avg_pov=(0(0.1)0.8))
+estimates save "mimrgns_lv"	
+ */
+estimates use "mimrgns_lv"
+ereturn display
+matrix T = r(table)
+ 
+
+local row = 3
+local col=1 
+
+foreach s in `sectors' {
+	local rt_col=`col'+8
+foreach col_idx of numlist `rt_col'/`col' {
+	local rt_col=`col'+8
+	putexcel C`row'=T[1,`col_idx']
+    local p = T[4, `col_idx']
+    if `p' < 0.05 {
+        putexcel C`row', bold
+    }
+    local row = `row' + 1
+
+} 
+
+local row = `row' + 1
+local col=`col'+ 9
+} 
+
+putexcel C`row' = `=e(N)'
+
+preserve
+mi extract 1, clear
+regress lnheadcount `sectors_fv' lnwap i.country_id i.year_cat if insample==1, vce(cluster country_id)
+unique country_code if e(sample)
+local row = `row' + 1
+putexcel C`row' = `=r(unique)'
+restore
+
+exit 

@@ -35,6 +35,15 @@ drop if country_code==""
 save "../data/incomegroup", replace 
 */ 
 
+/* load in working age population 
+wbopendata, indicator(SP.POP.1564.TO) clear long
+rename sp_pop wap 
+rename countrycode country_code 
+keep wap country_code countryname year 
+save "../data/wap", replace 
+*/ 
+
+
 clear
 *import delimited using "../data/combined_data_all"
 *save "../data/combined_data_all", replace 
@@ -44,8 +53,6 @@ append using "../data/combined_data_revisedF"
 replace sex="f" if sex=="" 
 append using "../data/combined_data_revisedM"
 replace sex="m" if sex=="" 
-
-
 
 rename ccode country_code  
 * rename time year 
@@ -84,10 +91,14 @@ drop _m
 count 
 unique country_code 
 
+merge 1:1 country_code year using "../data/wap", keep(1 3) nogen 
+
+
+
 merge n:1 country_code using "../data/incomegroup"
 
 
-keep country_code year emp* headcount poverty_gap population gdp incomegroup region_code  
+keep country_code year emp* headcount poverty_gap population gdp incomegroup region_code wap 
 
 
 
@@ -96,9 +107,9 @@ rename employ?InfraEenergy employ?InfraEnergy
 
 foreach gender in t m f {
 
-egen totemploy`gender'=rsum(employ`gender'Agribusiness employ`gender'AgricSE employ`gender'Health employ`gender'InfraEnergy employ`gender'Manufac employ`gender'Othernonag employ`gender'Tradenonvehicle employ`gender'Tourism)
+egen totemploy`gender'=rsum(employ`gender'Agribusiness employ`gender'AgricSE employ`gender'Health employ`gender'InfraEnergy employ`gender'Manufac employ`gender'Othernonag employ`gender'Trade employ`gender'Tourism)
 
-foreach sector in Agribusiness AgricSE Health InfraEnergy Manufac NoTourSplit Nontourism Othernonag Tradenonvehicle Tourism {
+foreach sector in Agribusiness AgricSE Health InfraEnergy Manufac NoTourSplit Nontourism Othernonag Trade Tourism {
 	gen share`gender'`sector'=employ`gender'`sector'/totemploy`gender'
 }
 

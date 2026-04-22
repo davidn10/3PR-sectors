@@ -1,28 +1,31 @@
 clear 
 
 use "../data/mi_data", replace 
-local sectors "sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth sharetTourism sharetManufac sharetOthernonag sharetTradenonvehicle"
+local sectors "lnemptInfraEnergy lnemptAgribusiness lnemptAgricSE lnemptHealth lnemptTourism lnemptManufac lnemptOthernonag lnemptTrade"
 
 local Nsectorsm1=7
+local Nsectors=8 
 
 ** do headcount estimation 
-mi estimate, post cmdok dots: fracreg probit headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
+mi estimate, post cmdok dots: fracreg probit headcount  `sectors' lnpopulation i.country_id i.year_cat, vce(cluster country_id)
 estimates save "poverty", replace  
 estimates use "poverty"
 
 putexcel set "D:\david\3PR\output\results_macro.xlsx", modify sheet("Poverty")
 
-mimrgns ,dydx(sharet*) post predict(cm)
+mimrgns ,dydx(lnempt*) post predict(cm)
 estimates save "mimrgns", replace 
 estimates use "mimrgns"
 
 ereturn display
 matrix T = r(table)
-matrix B=T[1,1..`Nsectorsm1']
+matrix B=T[1,1..`Nsectors']
 putexcel B2 = matrix(B')
 
+
+
 local row=2 
-foreach col_idx of numlist 1/`Nsectorsm1' {
+foreach col_idx of numlist 1/`Nsectors' {
 local p = T[4,`col_idx']
 	if `p' < 0.05 {
         putexcel B`row', bold
@@ -43,21 +46,21 @@ restore
 
  
 ** do poverty gap estimation 
-mi estimate, post cmdok dots: fracreg probit poverty_gap headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
+mi estimate, post cmdok dots: fracreg probit poverty_gap `sectors' lnpopulation i.country_id i.year_cat, vce(cluster country_id)
 estimates save "poverty_gap", replace  
 estimates use "poverty_gap"
 
-mimrgns ,dydx(sharet*) post predict(cm)
+mimrgns ,dydx(lnempt*) post predict(cm)
 estimates save "mimrgns_gap", replace 
 estimates use "mimrgns_gap"
 
 ereturn display
 matrix T = r(table)
-matrix B=T[1,1..`Nsectorsm1']
+matrix B=T[1,1..`Nsectors']
 putexcel C2 = matrix(B')
 
 local row=2 
-foreach col_idx of numlist 1/`Nsectorsm1' {
+foreach col_idx of numlist 1/`Nsectors' {
 local p = T[4,`col_idx']
 	if `p' < 0.05 {
         putexcel C`row', bold
@@ -71,7 +74,7 @@ putexcel C`row'=`=e(N)'
 exit  
 preserve 
 mi extract 1, clear
-fracreg probit headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
+fracreg probit headcount  `sectors' i.country_id i.year_cat, vce(cluster country_id)
 
 unique country_code if e(sample)
 putexcel c12=`=r(unique)'

@@ -8,7 +8,7 @@ local Nsectors=14
 
 
 ** do headcount estimation 
-mi estimate, post cmdok dots: fracreg probit headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
+mi estimate, post cmdok dots: fracreg probit headcount  `sectors' i.country_id i.year_cat, vce(cluster country_id)
 estimates save "poverty_both_genders", replace  
 estimates use "poverty_both_genders"
 
@@ -37,7 +37,7 @@ putexcel C`row'=`=e(N)'
 
 preserve 
 mi extract 1, clear
-fracreg probit headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
+fracreg probit headcount  `sectors' i.country_id i.year_cat, vce(cluster country_id)
 
 unique country_code if e(sample)
 local row=`row'+1 
@@ -45,7 +45,7 @@ putexcel C`row'=`=r(unique)'
 restore 
 
 ** do poverty gap estimation 
-mi estimate, post cmdok dots: fracreg probit poverty_gap headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
+mi estimate, post cmdok dots: fracreg probit poverty_gap headcount  `sectors' i.country_id i.year_cat, vce(cluster country_id)
 estimates save "poverty_gap", replace  
 estimates use "poverty_gap"
 
@@ -73,7 +73,7 @@ local row=`row'+1
   
 preserve 
 mi extract 1, clear
-fracreg probit headcount  `sectors' lnpop i.country_id i.year_cat, vce(cluster country_id)
+fracreg probit headcount  `sectors' i.country_id i.year_cat, vce(cluster country_id)
 
 unique country_code if e(sample)
 putexcel D`row'=`=r(unique)'
@@ -82,7 +82,7 @@ restore
 exit  
 
 ** output unweighted mean shares for each sector 
-mean sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth mean_sharetTourism sharetManufac mean_sharetOthernonag sharetTradenonvehicle 
+mean sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth mean_sharetTourism sharetManufac mean_sharetOthernonag sharetTrade
 matrix B=e(b)
 putexcel d2=matrix(B')
 

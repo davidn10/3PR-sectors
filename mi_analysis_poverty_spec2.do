@@ -2,7 +2,7 @@
 cd "D:\david\3PR\programs" 
 
 use "../data/mi_data", replace 
-local sectors "sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth sharetTourism sharetManufac sharetOthernonag sharetRetailtradenonvehicle"
+local sectors "sharetInfraEnergy sharetAgribusiness sharetAgricSE sharetHealth sharetTourism sharetManufac sharetOthernonag sharetTrade"
 
 gen emp_pop=totemployt/population 
 gen lnemp_pop=log(emp_pop) 
